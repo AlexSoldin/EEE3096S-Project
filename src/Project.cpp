@@ -140,8 +140,8 @@ void dismissAlarm(void){
 		delay(1000);
 		digitalWrite(ALARM_DISMISS_LED, LOW);
 
-   alarmEnabled=false; //disable the alarm when button pressed
-   alarmActive=false; //turn the alarm off when pressed
+   alarmEnabled = false; //disable the alarm when button pressed
+   alarmActive = false; //turn the alarm off when pressed
 	 previousAlarmTime = millis(); //set last alarm time to NOW when pressed
 
 	}
@@ -162,6 +162,7 @@ void monitoring(void){
 		digitalWrite(START_LED, LOW);
 
 		monitorConditions = !monitorConditions;
+
 	}
 	lastInterruptTime = interruptTime;
 }

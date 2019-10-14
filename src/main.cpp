@@ -41,7 +41,7 @@ int choice = 0;
 
 bool alarmActive = false;
 bool alarmEnabled = true;
-bool monitorConditions = true;
+volatile bool monitorConditions = true;
 bool first = true;
 
 long previousAlarmTime = 0;
@@ -214,16 +214,8 @@ int main(int argc, char* argv[]){
 	wiringPiI2CWriteReg8(RTC, HOUR, 0x0);
 	wiringPiI2CWriteReg8(RTC, MIN, 0x0);
 	wiringPiI2CWriteReg8(RTC, SEC, 0b10000000);
-
-	// Print out the time we have stored on our RTC
-	//printf("The current time is: %d:%d:%d\n", hexCompensation(HH), hexCompensation(MM), hexCompensation(SS));
-
 	pthread_join(thread_id, NULL);
   pthread_exit(NULL);
-
-	delay(1000); //milliseconds
-
-	return 0;
 }
 
 void *monitorThread(void *threadargs){
@@ -313,7 +305,7 @@ void setup_blynk()
  * Calculates time difference
  */
 long timeDiff(){
-	return millis()-startTimeInMillis;
+	return millis() - startTimeInMillis;
 }
 
 /*
@@ -463,6 +455,5 @@ void setCurrentTime(void){ //
 			wiringPiI2CWriteReg8(RTC, MIN, MM);
 
 			SS = decCompensation(SS);
-			secPWM(SS);
 			wiringPiI2CWriteReg8(RTC, SEC,  0b10000000 + SS);
 }

@@ -22,6 +22,7 @@ void monitoring(void);
 void *monitorThread(void *threadargs);
 void checkAlarm(int hour1, int min1, int sec1, int hour2, int min2, int sec2);
 void setDACOutput(float val);
+void setup_blynk(void);
 void printHeading(void);
 int hFormat(int hours);
 int mFormat(int mins);

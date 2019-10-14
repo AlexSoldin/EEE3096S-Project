@@ -52,9 +52,6 @@ int prevAlarmSec = 0;
 
 volatile long startTimeInMillis, currentTimeInMillis, timediff;
 
-static BlynkTransportSocket _blynkTransport;
-BlynkSocket Blynk(_blynkTransport);
-
 void initGPIO(void){
 	/*
 	 * Sets GPIO using wiringPi pins. see pinout.xyz for specific wiringPi pins
@@ -62,7 +59,7 @@ void initGPIO(void){
 	 * Note: wiringPi does not use GPIO or board pin numbers (unless specifically set to that mode)
 	 */
 	printf("Setting Up\n");
-	//wiringPiSetup(); //This is the default mode. If you want to change pinouts, be aware
+	wiringPiSetupGpio(); //This is the default mode. If you want to change pinouts, be aware
 
 	RTC = wiringPiI2CSetup(RTCAddr); //Set up the RTC
 	wiringPiSPISetup(SPI_DAC, SPI_CLOCKSPEED); //setup the SPI
@@ -110,11 +107,6 @@ void reset(void){
 		digitalWrite(RESET_LED, LOW);
 
     first=true; //resets the system time
-		system("clear");
-		printHeading();
-		monitorConditions = false;
-
-
 	}
 	lastInterruptTime = interruptTime;
 }
@@ -165,6 +157,8 @@ void dismissAlarm(void){
    alarmEnabled=false; //disable the alarm when button pressed
    alarmActive=false; //turn the alarm off when pressed
 	 previousAlarmTime = millis(); //set last alarm time to NOW when pressed
+	 Blynk.virtualWrite(V0, 0);
+	 Blynk.virtualWrite(V5, "Alarm Dismissed\n");
 
 	}
 	lastInterruptTime = interruptTime;
@@ -192,7 +186,7 @@ void monitoring(void){
  * The main function
  * This function is called, and calls all relevant functions we've written
  */
-int main(void){
+int main(int argc, char* argv[]){
 
   signal(SIGINT, cleanup);
 	initGPIO();
@@ -236,7 +230,9 @@ void *monitorThread(void *threadargs){
 
     for(;;){
 
-			while (!monitorConditions) continue;
+			while (!monitorConditions){
+				continue;
+			}
 			 Blynk.run();
 
 			 hours = getHours();
@@ -253,6 +249,9 @@ void *monitorThread(void *threadargs){
 			 shours = (timediff/(1000*60*60))%60;
 			 smins = (timediff/(1000*60))%60;
 			 ssecs = (timediff/1000)%60;
+
+			 Blynk.virtualWrite(V5, "RTC Time: ", hours, ":", mins, ":", secs, "\n");
+			 Blynk.virtualWrite(V5, "System Time: ", shours, ":", smins, ":", ssecs, "\n");
 
 			//Reading from ADC
 			int temperatureReading = analogRead(BASE+0); //temp on channel zero
@@ -271,7 +270,7 @@ void *monitorThread(void *threadargs){
 			Blynk.virtualWrite(V1, light);
 			Blynk.virtualWrite(V2, temperatureInCelsius);
 			Blynk.virtualWrite(V3, humidity);
-
+			Blynk.virtualWrite(V4, dacOutput);
 
 			if(millis()-previousAlarmTime>5000){ //5 seconds for now
 			 previousAlarmTime=millis(); //alarm was dismissed NOW
@@ -282,11 +281,12 @@ void *monitorThread(void *threadargs){
 
 				if(alarmEnabled){ //if the alarm can be triggered
 					alarmActive=true; //trigger the alarm
+					Blynk.virtualWrite(V0, 255);
 				}
 			}
 
 			if(alarmActive){
-				secPWM(dacOutput);
+				secPWM(SS);
 				printf("    %02d:%02d:%02d       %02d:%02d:%02d           %-14.2f%-12.2f%-12d%-14.2f%-14s\n", hours, mins, secs, shours,smins,ssecs, humidity, temperatureInCelsius, light, dacOutput, "*");
 			}
 			else{
@@ -306,7 +306,7 @@ void *monitorThread(void *threadargs){
 void setup_blynk()
 {
     Blynk.begin(auth, serv, port);
-    //Blynk.virtualWrite(V4, "clr");
+    Blynk.virtualWrite(V5, "clr");
 }
 
 /*
@@ -371,7 +371,7 @@ int mFormat(int mins){
  * PWM on the ALARM LED
  */
 void secPWM(int units){
-	softPwmCreate(ALARM_LED, 0, 1023);
+	//softPwmCreate(ALARM_LED, 0, 1023);
 	softPwmWrite(ALARM_LED, units);
 }
 /*

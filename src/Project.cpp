@@ -91,9 +91,6 @@ void reset(void){
 		digitalWrite(RESET_LED, LOW);
 
     first=true; //resets the system time
-		system("clear");
-		printHeading();
-		monitorConditions = false;
 
 
 	}

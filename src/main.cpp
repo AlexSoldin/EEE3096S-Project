@@ -65,7 +65,7 @@ void initGPIO(void){
 	//wiringPiSetup(); //This is the default mode. If you want to change pinouts, be aware
 
 	RTC = wiringPiI2CSetup(RTCAddr); //Set up the RTC
-	wiringPiSPISetup(SPI_CHAN, SPI_CLOCKSPEED); //setup the SPI
+	wiringPiSPISetup(SPI_DAC, SPI_CLOCKSPEED); //setup the SPI
 	mcp3004Setup(BASE, SPI_CHAN); //setup mcp3004 library
 
 	//Set up the LEDS
@@ -267,6 +267,10 @@ void *monitorThread(void *threadargs){
 			int light = analogRead(BASE+2); //light from LDR on channel 2
 
 			float dacOutput = (light / 1024.0) * humidity;
+
+			Blynk.virtualWrite(V1, light);
+			Blynk.virtualWrite(V2, temperatureInCelsius);
+			Blynk.virtualWrite(V3, humidity);
 
 
 			if(millis()-previousAlarmTime>5000){ //5 seconds for now

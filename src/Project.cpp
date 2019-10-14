@@ -28,16 +28,13 @@ bool alarmEnabled = true;
 bool monitorConditions = true;
 bool first = true;
 
+long previousAlarmTime = 0;
+
 int prevAlarmHour = 0;
 int prevAlarmMin = 0;
 int prevAlarmSec = 0;
 
 volatile long startTimeInMillis, currentTimeInMillis, timediff;
-
-
-long timeDiff(){
-return millis()-startTimeInMillis;
-}
 
 void initGPIO(void){
 	/*
@@ -46,7 +43,7 @@ void initGPIO(void){
 	 * Note: wiringPi does not use GPIO or board pin numbers (unless specifically set to that mode)
 	 */
 	printf("Setting Up\n");
-	wiringPiSetup(); //This is the default mode. If you want to change pinouts, be aware
+	wiringPiSetupGpio(); //This is the default mode. If you want to change pinouts, be aware
 
 	RTC = wiringPiI2CSetup(RTCAddr); //Set up the RTC
 	wiringPiSPISetup(SPI_CHAN, SPI_CLOCKSPEED); //setup the SPI
@@ -93,12 +90,11 @@ void reset(void){
 		delay(1000);
 		digitalWrite(RESET_LED, LOW);
 
-		wiringPiI2CWriteReg8(RTC, HOUR, 0x0);
-    wiringPiI2CWriteReg8(RTC, MIN, 0x0);
-    wiringPiI2CWriteReg8(RTC, SEC, 0b10000000);
-
+    first=true; //resets the system time
 		system("clear");
 		printHeading();
+		monitorConditions = false;
+
 
 	}
 	lastInterruptTime = interruptTime;
@@ -147,7 +143,9 @@ void dismissAlarm(void){
 		delay(1000);
 		digitalWrite(ALARM_DISMISS_LED, LOW);
 
-		alarmActive = false;
+   alarmEnabled=false; //disable the alarm when button pressed
+   alarmActive=false; //turn the alarm off when pressed
+	 previousAlarmTime = millis(); //set last alarm time to NOW when pressed
 
 	}
 	lastInterruptTime = interruptTime;
@@ -170,6 +168,7 @@ void monitoring(void){
 	}
 	lastInterruptTime = interruptTime;
 }
+
 /*
  * The main function
  * This function is called, and calls all relevant functions we've written
@@ -180,8 +179,6 @@ int main(void){
 	initGPIO();
 	//set the RTC registers with the current system time
 	setCurrentTime();
-
-
 
 	// Initialize thread with parameters
   // Set the main thread to have a priority of 99
@@ -202,8 +199,6 @@ int main(void){
 
 	// Print out the time we have stored on our RTC
 	//printf("The current time is: %d:%d:%d\n", hexCompensation(HH), hexCompensation(MM), hexCompensation(SS));
-
-
 
 	pthread_join(thread_id, NULL);
   pthread_exit(NULL);
@@ -233,19 +228,10 @@ void *monitorThread(void *threadargs){
 			 }
 
 			 timediff = millis() - startTimeInMillis;
-			 shours = (timediff/1000*60*60)%60;
-			 smins = (timediff/1000*60)%60;
+
+			 shours = (timediff/(1000*60*60))%60;
+			 smins = (timediff/(1000*60))%60;
 			 ssecs = (timediff/1000)%60;
-
-      string systemHour = to_string(decCompensation(shours));
-      string systemMin = to_string(decCompensation(smins));
-			string systemSec = to_string(decCompensation(ssecs));
-      string systemTime = string(systemHour + ":" + systemMin + ":" + systemSec);
-
-			string currentHour = to_string(getHours());
-			string currentMin = to_string(getMins());
-			string currentSec = to_string(getSecs());
-			string currentTime = string(currentHour + ":" + currentMin + ":" + currentSec);
 
 			//Reading from ADC
 			int temperatureReading = analogRead(BASE+0); //temp on channel zero
@@ -261,28 +247,30 @@ void *monitorThread(void *threadargs){
 
 			float dacOutput = (light / 1024.0) * humidity;
 
-			checkAlarm(hours, mins, secs, prevAlarmHour, prevAlarmMin, prevAlarmSec);
+
+			if(millis()-previousAlarmTime>5000){ //5 seconds for now
+			 previousAlarmTime=millis(); //alarm was dismissed NOW
+			 alarmEnabled = true;
+		 	}
 
 			if((dacOutput < 0.65 || dacOutput > 2.65)){
 
-				if(alarmEnabled){
-					alarmActive = true;
-					prevAlarmHour = hours;
-					prevAlarmMin = mins;
-					prevAlarmSec = secs;
+				if(alarmEnabled){ //if the alarm can be triggered
+					alarmActive=true; //trigger the alarm
 				}
-
 			}
 
 			if(alarmActive){
 				secPWM(dacOutput);
-				printf("    %-17s%-17s%-14.2f%-12.2f%-12d%-14.2f%-14s\n", currentTime.c_str(), systemTime.c_str(), humidity, temperatureInCelsius, light, dacOutput, "*");
+				printf("    %02d:%02d:%02d       %02d:%02d:%02d           %-14.2f%-12.2f%-12d%-14.2f%-14s\n", hours, mins, secs, shours,smins,ssecs, humidity, temperatureInCelsius, light, dacOutput, "*");
 			}
 			else{
 				secPWM(0);
-				printf("    %-17s%-17s%-14.2f%-12.2f%-12d%-14.2f%-14s\n", currentTime.c_str(), systemTime.c_str(), humidity, temperatureInCelsius, light, dacOutput, " ");
+				printf("    %02d:%02d:%02d       %02d:%02d:%02d           %-14.2f%-12.2f%-12d%-14.2f%-14s\n", hours, mins, secs, shours,smins,ssecs, humidity, temperatureInCelsius, light, dacOutput, " ");
 			}
 			//printf("--------------------------------------------------------------------------------------------------\n");
+
+			setDACOutput(dacOutput);
 
 			delay(increment);
 
@@ -290,56 +278,26 @@ void *monitorThread(void *threadargs){
     pthread_exit(NULL);
 }
 
-// void updateSystemTime(SS, MM, HH, ){
-//     int second1 = rtcTime[0];
-//     int minute1 = rtcTime[1];
-//     int hour1 = rtcTime[2];
-//     int second2 = timeOfStart[0];
-//     int minute2 = timeOfStart[1];
-//     int hour2 = timeOfStart[2];
-//
-//     if(second2 > second1) {
-//       minute1--;
-//       second1 += 60;
-//     }
-//
-//    systemTime[0] = second1 - second2;
-//
-//    if(minute2 > minute1) {
-//       hour1--;
-//       minute1 += 60;
-//    }
-//    systemTime[1] = minute1 - minute2;
-//    systemTime[2] = hour1 - hour2;
-// }
+/*
+ * Calculates time difference
+ */
+long timeDiff(){
+	return millis()-startTimeInMillis;
+}
 
 /*
- * Calculate amount of time between alarms being triggered
+ * Writes output voltage to DAC
  */
-void checkAlarm(int hour1, int min1, int sec1, int hour2, int min2, int sec2){
-	int diff_hour, diff_min, diff_sec;
+void setDACOutput(float val){
+	// buffer to store values to send to dac
+	unsigned char buffer[2];
+	// convert voltage to char
+	unsigned char ch = (unsigned char) ((val/3.3)*255);
 
-  if(sec2 > sec1) {
-      min1--;
-      sec1 += 60;
-   }
+	buffer[0] = 0b00110000 | ch>>4; //Set config bits for first 8 bit packet and OR with upper bits
+	buffer[1] = ch<<4; //Set next 8 bit packet
 
-   diff_sec = sec1 - sec2;
-
-   if(min2 > min1) {
-      hour1--;
-      min1 += 60;
-   }
-
-   diff_min = min1 - min2;
-   diff_hour = hour1 - hour2;
-
-   if ((diff_hour >= 0) && (diff_sec >= 0) && (diff_min >= 3)) { //3 minutes have passed
-		 alarmEnabled = true;
-   }
-   else {
-		 alarmEnabled = false;
-   }
+	wiringPiSPIDataRW (SPI_DAC, &buffer[0], 2);
 }
 
 /*

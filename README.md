@@ -2,6 +2,4 @@
 
 
 
-<p> 
-<img src="https://imgur.com/a/vuZHeLj">
-</p>
+[Imgur](https://i.imgur.com/narxFsp.png)

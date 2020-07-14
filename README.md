@@ -2,4 +2,6 @@
 
 
 
-[Imgur](https://i.imgur.com/narxFsp.png)
+<p> 
+<img src="https://imgur.com/narxFsp">
+</p>

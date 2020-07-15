@@ -1,6 +1,6 @@
 # Environmental Logger
 
-The speciﬁcation provided explains that the system should output a voltage to be directly monitored by external recording equipment. The value of this voltage is calculated according to sensor characteristics.
+The specification provided explains that the system should output a voltage to be directly monitored by external recording equipment. The value of this voltage is calculated according to sensor characteristics.
 
 If this voltage is below 0.65V or above 2.65V , an alarm LED will be illuminated indicating the alarm being triggered.
 
